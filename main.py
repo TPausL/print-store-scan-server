@@ -7,6 +7,7 @@ from models import Color, Product
 from utils import *
 import os
 from dotenv import load_dotenv
+from sqlalchemy import select
 
 load_dotenv()
 
@@ -33,8 +34,21 @@ def store():
     if color_index == -1:
         return "could not find color in database, you may add a new color with the /color request!", 404
     product = Product(shape_id=shape,size_id=size,color_id=colors[color_index].id)
-    db.session.add(product)
+    product
+    try:
+        existing_prod: Product = db.session.execute(
+            select(Product)
+            .where(Product.color_id == colors[color_index].id)
+            .where(Product.shape_id == shape)
+            .where(Product.size_id == size)
+        ).scalar_one()
+        existing_prod.count = existing_prod.count + 1
+        db.session.flush()
+    except Exception as e:
+        db.session.add(product)
     db.session.commit()
+
+
     return "Succesfully added one product with color " + colors[color_index].text + " to database"
 
 @app.route("/color", methods=["PUT"])

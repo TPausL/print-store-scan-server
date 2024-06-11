@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.schema import CheckConstraint
 from typing import List,Optional
 from database import Base
-from sqlalchemy import String, ARRAY, Integer, Float, ForeignKey, ForeignKeyConstraint
+from sqlalchemy import String, ARRAY, Integer, Float, ForeignKey, UniqueConstraint
 from geoalchemy2 import  Geometry
 
 import uuid
@@ -14,6 +14,10 @@ class Color(Base):
     text: Mapped[str] = mapped_column(String(50))
     hex: Mapped[str] = mapped_column(String(9))
     products: Mapped[List["Product"]] = relationship(back_populates="color")
+
+    __table_args__ = (
+        UniqueConstraint("hex"), 
+    )
 
 class Size(Base):
     __tablename__ = "sizes"
@@ -43,6 +47,12 @@ class Product(Base):
 
     shape_id: Mapped[UUID] = mapped_column(ForeignKey("shapes.id"))
     shape: Mapped["Shape"] = relationship(back_populates="products")
+
+    count: Mapped[Integer] = mapped_column(Integer, default=1)
+
+    __table_args__ = (
+        UniqueConstraint("color_id", "size_id", "shape_id"), 
+    )
 
 
 
