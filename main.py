@@ -30,7 +30,7 @@ def store():
     nparr = np.fromstring(request.data, np.uint8)
     # decode image
     im = cv.imdecode(nparr, cv2.IMREAD_COLOR)
-    cv.imwrite(time.strftime("%Y%m%d-%H%M%S")+ ".jpeg",im)
+    cv.imwrite("./images/"+time.strftime("%Y%m%d-%H%M%S")+ ".jpeg",im)
 
     shape = "6d8ef867-6123-43dd-a8a8-1650f9a3c772"
     size = "5d60af42-0789-4371-9e6a-aaa595f06edc"
@@ -62,14 +62,15 @@ def test():
 @app.route("/color", methods=["PUT"])
 def post_color():
     f = request.files["image"]
-    f.save("im")
-    im = cv.imread("im")
+   
+    f.save("im.jpeg")
+    im = cv.imread("im.jpeg")
     hex_str = analyze_color(im)
     text = request.form["text"]
     color = Color(hex=hex_str,text=text)
     db.session.add(color)
     db.session.commit()
-    return {"message": "added one object", "data": {"text": color.text, "hex": color.hex}}, 201
+    return {"message": "added one color", "data": {"text": color.text, "hex": color.hex}}, 201
 
 
 
