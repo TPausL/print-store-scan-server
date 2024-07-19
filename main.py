@@ -1,15 +1,18 @@
+from asyncpg import UniqueViolationError
 from flask import Flask
 from flask import request
 import cv2 as cv
+import sqlalchemy
 from image_processing import classify_color, analyze_color
 from database import db, init_db
 from models import Color, Product
 from utils import *
 import os
 from dotenv import load_dotenv
-from sqlalchemy import select
+from sqlalchemy import select, exc
 from flask_json import FlaskJSON
 import time
+import psycopg2
 
 """
     Setup the Flask app and the database connection.
@@ -28,7 +31,7 @@ with app.app_context():
 def store():
     
     if not request.data:
-        return {"message": "Keine Bilddaten wurden gesendet"}, 400
+        return {"message": "Keine Bilddaten gesendet"}, 400
     nparr = np.fromstring(request.data, np.uint8)
     im = cv.imdecode(nparr, cv2.IMREAD_COLOR)
     cv.imwrite("./images/"+time.strftime("%Y%m%d-%H%M%S")+ ".jpeg",im) # Store image for later AI training
@@ -50,34 +53,41 @@ def store():
 
     # add one to existing product count or add new product
     try:
-        existing_prod: Product = db.session.execute(
-            select(Product)
-            .where(Product.color_id == colors[color_index].id)
-            .where(Product.shape_id == shape)
-            .where(Product.size_id == size)
-        ).scalar_one()
-        res_p = existing_prod
-        existing_prod.count = existing_prod.count + 1
+        try:
+            existing_prod: Product = db.session.execute(
+                select(Product)
+                .where(Product.color_id == colors[color_index].id)
+                .where(Product.shape_id == shape)
+                .where(Product.size_id == size)
+            ).scalar_one()
+            res_p = existing_prod
+            existing_prod.count = existing_prod.count + 1
+        except Exception as e:
+            res_p = product
+        db.session.flush()
+        db.session.commit()
     except Exception as e:
-        res_p = product
-        db.session.add(product)
-    db.session.flush()
-    db.session.commit()
+        return {"message": "Fehler beim Hinzufügen des Produktes"}, 500
     return {"message": "Ein Produkt wurde hinzugefügt", "data": {"color": res_p.color.text, "shape": res_p.shape.text, "size": res_p.size.text}}, 201
 
 
 @app.route("/color", methods=["PUT", "POST"])
 def post_color():
     if not request.data:
-        return {"message": "Keine Bilddaten wurden gesendet"}, 400
+        return {"message": "Keine Bilddaten gesendet"}, 400
     nparr = np.fromstring(request.data, np.uint8)
     im = cv.imdecode(nparr, cv2.IMREAD_COLOR)
     #find color of the product and save as new color in database
     hex_str = analyze_color(im)
     text = "unbenannte Farbe"
     color = Color(hex=hex_str,text=text,display_hex=hex_str)
-    db.session.add(color)
-    db.session.commit()
+    try:
+        db.session.add(color)
+        db.session.commit()
+    except exc.IntegrityError as e:
+        return {"message": "Farbe bereits vorhanden", "data": {"text": color.text, "hex": color.hex}}, 200 #304 cant send additional data
+    except Exception as e:
+        return {"message": "Fehler beim Hinzufügen der Farbe"}, 500
     return {"message": "added one color", "data": {"text": color.text, "hex": color.hex}}, 201
 
 
