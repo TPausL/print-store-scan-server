@@ -3,11 +3,14 @@ import numpy as np
 from typing import Tuple
 import os
 
+# convert hex color to hsv color
 def hex_to_hsv(hex_code):
     rgb_tuple = tuple(int(hex_code[i+1:i+3], 16) for i in (0, 2, 4))
     hsv_tuple = cv2.cvtColor(np.uint8([[rgb_tuple]]), cv2.COLOR_RGB2HSV)[0][0]
     return hsv_tuple
 
+
+# apply thresholds to color (what range should be treated as a match for the color)
 def get_hsv_threshold(hsv_col: Tuple[int,int,int]):
     factor = float(os.getenv("FACTOR_THRES_GEN", 10))/100
     h,s,v = hsv_col

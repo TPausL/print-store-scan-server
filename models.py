@@ -1,18 +1,25 @@
 from sqlalchemy.orm import Mapped,mapped_column,relationship
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.schema import CheckConstraint
-from typing import List,Optional
+from typing import List
 from database import Base
-from sqlalchemy import String, ARRAY, Integer, Float, ForeignKey, UniqueConstraint
-from geoalchemy2 import  Geometry
+from sqlalchemy import String, Integer, Float, ForeignKey, UniqueConstraint
 
 import uuid
+
+"""
+    Define the database models. 
+    (Note: Models not at state of newest migration but contain enough information to add new products 
+    (other values are defaulted in DB). 
+    As database connector will be changed to prisma)
+
+"""
 
 class Color(Base):
     __tablename__ = "colors"
     id: Mapped[UUID] = mapped_column(UUID,primary_key=True,default=uuid.uuid4)
     text: Mapped[str] = mapped_column(String(50))
     hex: Mapped[str] = mapped_column(String(9))
+    display_hex: Mapped[str] = mapped_column(String(9))
     products: Mapped[List["Product"]] = relationship(back_populates="color")
 
     __table_args__ = (

@@ -1,47 +1,35 @@
 import cv2 as cv
 import numpy as np
-import argparse
-import matplotlib.pyplot as plt
-import mpl_toolkits
-import time
 import random as rng
 import os
-#from calibrate import get_color_thresholds
 
-""" def read_thresholds(filename):
-    with open(filename) as file:
-        lines = file.readlines()
-        names = []
-        thresholds = np.ndarray(shape= (len(lines),2,3))
-        for (i,l) in enumerate(lines):
-            l = l.split(";")
-            thresholds[i][0] = l[1].split(",")
-            thresholds[i][1] = l[2].split(",")
-            names.append(l[0])
-        return thresholds,names """
 
 rng.seed(1234)
 
 
-
+"""
+    Analyses the color of the image by trying to cut the background off and averaging the color of the remaining image.
+"""
 def analyze_color(image: cv.typing.MatLike):
-    image = cv.resize(image,None, fx=0.3, fy=0.3,interpolation=cv.INTER_LINEAR)
-    cv.imwrite("add_color_image.jpeg" , image)
 
+    cv.imwrite("add_color_image.jpeg" , image)
     image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
-    threshold = 80
+    threshold = 110
     _, mask = cv.threshold(image_gray, threshold, threshold, 1 )
 
     cv.imwrite("add_color_mask.jpeg" , mask)
 
     mean = cv.mean(image,mask)
     mean_rgb = cv.cvtColor(np.uint8([[mean[0:3]]]), cv.COLOR_BGR2RGB)[0][0]
-    hex_str = "#" + "".join([hex(int(i)).split("x")[1] for i in mean_rgb[0:3]])
+    print(mean_rgb)
+    hex_str = '#%02x%02x%02x' % tuple(mean_rgb)
     return hex_str
 
 
-    
+"""
+Try to find which color is a (the best match) for the product in the image, by comparing the image to each color (thresholds) in the DB and within a certain range considering the biggest as a match
+"""
 def classify_color(image: cv.typing.MatLike,thresholds):
     
     image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
@@ -55,6 +43,8 @@ def classify_color(image: cv.typing.MatLike,thresholds):
         dilate_size = int(os.getenv("FACTOR_DILATE", 20))
         dilate_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (2*dilate_size + 1, 2*dilate_size+1), (dilate_size, dilate_size))
         image_threshold = cv.dilate(image_threshold,dilate_kernel)
+        cv.imwrite("im_threshold" + str(i)  + ".jpeg" , image_threshold)
+
         contours, _ = cv.findContours(image_threshold, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         if(len(contours) <= 0): 
             continue
@@ -71,11 +61,5 @@ def classify_color(image: cv.typing.MatLike,thresholds):
     if color == None:
         return -1
     return color
-
-#parser = argparse.ArgumentParser(description='Code for detecting color off the biggest object in image')
-#parser.add_argument('--thresholds',"-t", help='Path to file that contains color value thresholds. \n (Format of file: [name;low_h,low_s,low_v;high_h,high_s,high_v])', default="thresholds.csv", type=str)
-#parser.add_argument('--input',"-i",required=True, help='File to scan', type=str)
-#args = parser.parse_args()
-
 
 

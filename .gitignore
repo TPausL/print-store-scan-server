@@ -3,3 +3,6 @@ __pycache__
 test_images
 venv
 images/*
+images
+im_threshold*.jpeg
+add_color_*.jpeg
