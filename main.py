@@ -1,8 +1,6 @@
-from asyncpg import UniqueViolationError
 from flask import Flask
 from flask import request
 import cv2 as cv
-import sqlalchemy
 from image_processing import classify_color, analyze_color
 from database import db, init_db
 from models import Color, Product
@@ -12,7 +10,6 @@ from dotenv import load_dotenv
 from sqlalchemy import select, exc
 from flask_json import FlaskJSON
 import time
-import psycopg2
 
 """
     Setup the Flask app and the database connection.
