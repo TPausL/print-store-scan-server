@@ -17,39 +17,55 @@ def get_segment_crop(img,tol=0, mask=None):
 """
 def analyze_color(image: cv.typing.MatLike):
 
-#    image_copy = image.copy()
-    cv.imwrite("add_color_image_raw.jpeg" , image)
-    image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+    def filterByRatio(contour):
+            (_,_,w,h) = cv.boundingRect(contour)
+            return w/h > 0.5 and w/h < 2
+    
+    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    print(cv.mean(image_gray))
+    cv.imwrite("im_gray.jpeg" , image_gray)
 
-    cv.imwrite("add_color_image.jpeg" , image_HSV)
-    #image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-   # cv.imwrite("add_color_image_gray.jpeg" , image_HSV)
-    threshold = 110
-    sat_factor = 0.1
-    val_factor = 0.9
-    print((0, 0, val_factor*255))
-    print((180, sat_factor*255, 255))
+    cv.imwrite("add_color_image.jpeg" , image)
+    image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+    sat_factor = 0.3
+    val_factor = 0.7
+
+
     mask = cv.bitwise_not(cv.inRange(image_HSV, (0, 0, val_factor*255),(180, sat_factor*255, 255)))
-    while(cv.countNonZero(mask) > 57600*0.2):
-        val_factor -= 0.05
-        sat_factor += 0.025
-        time.sleep(0.5)
-        output = cv.bitwise_and(image, image, mask = mask)
-        cv.imwrite("add_color_mask_out.jpeg" , output)
-        cv.imwrite("add_color_mask.jpeg" , mask) 
-        print("_________________________")
-        print((0, 0, val_factor*100)) 
-        print((0, sat_factor*100, 100))
+    contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    contours = sorted( filter(filterByRatio  ,contours), key=lambda x: cv.contourArea(x), reverse=True)
+    if(len(contours) <= 0):
+            return None
+    contour = contours[0]
+
+    while(cv.contourArea(contour) > 57600*0.3):
+        val_factor -= 0.0125
+        sat_factor += 0.0065
+
         mask = cv.bitwise_not(cv.inRange(image_HSV, (0, 0, val_factor*255),(180, sat_factor*255, 255)))
 
+        contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        contours = sorted( filter(filterByRatio  ,contours), key=lambda x: cv.contourArea(x), reverse=True)
+        if(len(contours) <= 0):
+                return None
+        contour = contours[0]
 
-    output = cv.bitwise_and(image, image, mask = mask)
-    cv.imwrite("add_color_mask_out.jpeg" , output)
-    cv.imwrite("add_color_mask.jpeg" , mask) 
 
-    mean = cv.mean(image,mask)
+
+
+
+    black = np.zeros_like(mask)
+    cv.drawContours(black, [contour], -1, 255, cv.FILLED)
+    cv.imwrite("add_color_mask.jpeg" , black)
+    new_mask = cv.bitwise_and(mask, mask, mask = black)
+    output = cv.bitwise_and(image, image, mask = new_mask)
+    cv.imwrite("add_color_image_out.jpeg" , output)
+    cv.imwrite("add_color_mask_final.jpeg" , new_mask)
+
+
+    mean = cv.mean(image,new_mask)
     mean_rgb = cv.cvtColor(np.uint8([[mean[0:3]]]), cv.COLOR_BGR2RGB)[0][0]
-    print(mean_rgb)
     hex_str = '#%02x%02x%02x' % tuple(mean_rgb)
     return hex_str
  
