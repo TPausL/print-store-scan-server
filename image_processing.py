@@ -2,30 +2,57 @@ import cv2 as cv
 import numpy as np
 import random as rng
 import os
-
+import time
 
 rng.seed(1234)
 
+
+def get_segment_crop(img,tol=0, mask=None):
+    if mask is None:
+        mask = img > tol
+    return img[np.ix_(mask.any(1), mask.any(0))]
 
 """
     Analyses the color of the image by trying to cut the background off and averaging the color of the remaining image.
 """
 def analyze_color(image: cv.typing.MatLike):
 
-    cv.imwrite("add_color_image.jpeg" , image)
-    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+#    image_copy = image.copy()
+    cv.imwrite("add_color_image_raw.jpeg" , image)
+    image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
 
+    cv.imwrite("add_color_image.jpeg" , image_HSV)
+    #image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+   # cv.imwrite("add_color_image_gray.jpeg" , image_HSV)
     threshold = 110
-    _, mask = cv.threshold(image_gray, threshold, threshold, 1 )
+    sat_factor = 0.1
+    val_factor = 0.9
+    print((0, 0, val_factor*255))
+    print((180, sat_factor*255, 255))
+    mask = cv.bitwise_not(cv.inRange(image_HSV, (0, 0, val_factor*255),(180, sat_factor*255, 255)))
+    while(cv.countNonZero(mask) > 57600*0.2):
+        val_factor -= 0.05
+        sat_factor += 0.025
+        time.sleep(0.5)
+        output = cv.bitwise_and(image, image, mask = mask)
+        cv.imwrite("add_color_mask_out.jpeg" , output)
+        cv.imwrite("add_color_mask.jpeg" , mask) 
+        print("_________________________")
+        print((0, 0, val_factor*100)) 
+        print((0, sat_factor*100, 100))
+        mask = cv.bitwise_not(cv.inRange(image_HSV, (0, 0, val_factor*255),(180, sat_factor*255, 255)))
 
-    cv.imwrite("add_color_mask.jpeg" , mask)
+
+    output = cv.bitwise_and(image, image, mask = mask)
+    cv.imwrite("add_color_mask_out.jpeg" , output)
+    cv.imwrite("add_color_mask.jpeg" , mask) 
 
     mean = cv.mean(image,mask)
     mean_rgb = cv.cvtColor(np.uint8([[mean[0:3]]]), cv.COLOR_BGR2RGB)[0][0]
     print(mean_rgb)
     hex_str = '#%02x%02x%02x' % tuple(mean_rgb)
     return hex_str
-
+ 
 
 """
 Try to find which color is a (the best match) for the product in the image, by comparing the image to each color (thresholds) in the DB and within a certain range considering the biggest as a match
@@ -33,6 +60,8 @@ Try to find which color is a (the best match) for the product in the image, by c
 def classify_color(image: cv.typing.MatLike,thresholds):
     
     image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+
+    cv.imwrite("im_hsv.jpeg" , image_HSV) 
     possible_colors = []
     min_area_size = (image.size/3)* float(os.getenv("FACTOR_MIN_AREA", 1))/100
     max_area_size = (image.size/3)*float(os.getenv("FACTOR_MAX_AREA", 40))/100

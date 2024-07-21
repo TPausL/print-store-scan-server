@@ -61,11 +61,14 @@ def store():
             existing_prod.count = existing_prod.count + 1
         except Exception as e:
             res_p = product
+            db.session.add(product)
         db.session.flush()
         db.session.commit()
+        return {"message": "Ein Produkt wurde hinzugefügt", "data": {"color": res_p.color.text, "shape": res_p.shape.text, "size": res_p.size.text}}, 201
+
     except Exception as e:
+        print(e)
         return {"message": "Fehler beim Hinzufügen des Produktes"}, 500
-    return {"message": "Ein Produkt wurde hinzugefügt", "data": {"color": res_p.color.text, "shape": res_p.shape.text, "size": res_p.size.text}}, 201
 
 
 @app.route("/color", methods=["PUT", "POST"])
