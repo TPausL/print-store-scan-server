@@ -11,10 +11,19 @@ from sqlalchemy import select
 from flask_json import FlaskJSON, json_response
 import time
 import sqlalchemy.exc as exc
+from flask_sse import sse
+from flask_cors import CORS
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
+
+
+
+app.config["REDIS_URL"] = os.getenv("REDIS_URL")
+app.register_blueprint(sse, url_prefix='/stream')
+
 
 json = FlaskJSON(app)
 
@@ -55,6 +64,7 @@ def store():
         db.session.add(product)
     db.session.flush()
     db.session.commit()
+    sse.publish({"message": "added one object", "data": {"color": res_p.color.text, "shape": res_p.shape.text, "size": res_p.size.text}},type="new_product")
     return {"message": "added one object", "data": {"color": res_p.color.text, "shape": res_p.shape.text, "size": res_p.size.text}}, 201
 
 
@@ -75,9 +85,12 @@ def post_color():
         db.session.add(color)
         db.session.commit()
     except exc.IntegrityError as e:
+        sse.publish({"message": "Farbe bereits vorhanden", "data": {"text": color.text, "hex": color.hex}},type="new_color_exists")
         return {"message": "Farbe bereits vorhanden", "data": {"text": color.text, "hex": color.hex}}, 200 #304 cant send additional data
     except Exception as e:
         return {"message": "Fehler beim Hinzufügen der Farbe"}, 500
+               
+    sse.publish({"message": "added one color", "data": {"text": color.text, "hex": color.hex}},type="new_color")
     return {"message": "added one color", "data": {"text": color.text, "hex": color.hex}}, 201
 
 
