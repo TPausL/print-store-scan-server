@@ -1,5 +1,5 @@
 @Library("teckdigital") _
-def appName = "proxy"
+def appName = "print-store-scan-server"
 
 pipeline {
    agent {
