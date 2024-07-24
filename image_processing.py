@@ -3,6 +3,7 @@ import numpy as np
 import random as rng
 import os
 import time
+from imutils import contours as im_contours
 
 rng.seed(1234)
 
@@ -27,8 +28,8 @@ def analyze_color(image: cv.typing.MatLike):
 
     cv.imwrite("add_color_image.jpeg" , image)
     image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
-    sat_factor = 0.3
-    val_factor = 0.7
+    sat_factor = 0.2
+    val_factor = 0.8
 
 
     mask = cv.bitwise_not(cv.inRange(image_HSV, (0, 0, val_factor*255),(180, sat_factor*255, 255)))
@@ -39,9 +40,9 @@ def analyze_color(image: cv.typing.MatLike):
             return None
     contour = contours[0]
 
-    while(cv.contourArea(contour) > 57600*0.3):
-        val_factor -= 0.0125
-        sat_factor += 0.0065
+    while(cv.countNonZero(mask) > 57600*0.15):
+        val_factor -= 0.01
+        sat_factor += 0.005
 
         mask = cv.bitwise_not(cv.inRange(image_HSV, (0, 0, val_factor*255),(180, sat_factor*255, 255)))
 
@@ -68,13 +69,53 @@ def analyze_color(image: cv.typing.MatLike):
     mean_rgb = cv.cvtColor(np.uint8([[mean[0:3]]]), cv.COLOR_BGR2RGB)[0][0]
     hex_str = '#%02x%02x%02x' % tuple(mean_rgb)
     return hex_str
- 
+
+
+def find_contours(image: cv.typing.MatLike):
+    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+
+    edged = cv.Canny(image_gray, 15, 50)
+    edged = cv.dilate(edged, None, iterations=1)
+    edged = cv.erode(edged, None, iterations=1)
+
+    cv.imwrite("im_edges.jpeg" , edged)
+
+    contours,_ =cv.findContours(edged.copy(), cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+    contours = list(filter(lambda t: cv.contourArea(t[0]) < 100, contours))
+    contours = sorted(contours, key=lambda x: cv.contourArea(x), reverse=True)
+
+    return contours
+
+def get_size_ref(contours,ref_size):
+    mid_x = 100000000
+    radius = 0
+    for c in contours:
+        (mx,my),r = cv.minEnclosingCircle(c)
+        if mx > mid_x:
+            continue
+        mid_x = mx
+        radius = r
+    return (2*radius / ref_size) 
+
+def get_size(image):
+    image = image.copy()    
+
+    contours = find_contours(image)
+    pixels_per_mm = get_size_ref(contours,float(os.getenv("REF_SIZE", 5)))    
+    contour = contours[0]
+    cv.drawContours(image, [contour], -1, (0, 255, 0), 2)
+    cv.imwrite("im_contours.jpeg" , image)
+    (x,y,w,h) = cv.boundingRect(contour)
+    size = (w/pixels_per_mm,h/pixels_per_mm)
+    return size
+     
 
 """
 Try to find which color is a (the best match) for the product in the image, by comparing the image to each color (thresholds) in the DB and within a certain range considering the biggest as a match
 """
 def classify_color(image: cv.typing.MatLike,thresholds):
-    
+
+    #contours = find_contours(image)
     image_HSV = cv.cvtColor(image, cv.COLOR_BGR2HSV)
 
     cv.imwrite("im_hsv.jpeg" , image_HSV) 

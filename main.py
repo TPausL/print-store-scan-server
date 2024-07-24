@@ -1,9 +1,9 @@
 from flask import Flask
 from flask import request
 import cv2 as cv
-from image_processing import classify_color, analyze_color
+from image_processing import classify_color, analyze_color, get_size
 from database import db, init_db
-from models import Color, Product
+from models import Color, Product, Size
 from utils import *
 import os
 from dotenv import load_dotenv
@@ -35,27 +35,52 @@ with app.app_context():
 
 @app.route("/product", methods=["PUT", "POST"])
 def store():
-    colors = Color.query.all()
-    #names = [c.text for c in colors]
-    thresholds = [(get_hsv_threshold(hex_to_hsv(c.hex))) for c in colors]
+   
+    if not request.data:
+        return {"message": "Keine Bilddaten gesendet"}, 400
     nparr = np.fromstring(request.data, np.uint8)
     # decode image
-    im = cv.imdecode(nparr, cv2.IMREAD_COLOR)
+    try:
+        im = cv.imdecode(nparr, cv2.IMREAD_COLOR)
+    except Exception as e:
+        return {"message": "Fehler beim Lesen des Bildes"}, 400
     cv.imwrite("./images/"+time.strftime("%Y%m%d-%H%M%S")+ ".jpeg",im)
 
-    shape = "6d8ef867-6123-43dd-a8a8-1650f9a3c772"
-    size = "5d60af42-0789-4371-9e6a-aaa595f06edc"
+
+    colors = Color.query.all()
+    thresholds = [(get_hsv_threshold(hex_to_hsv(c.hex))) for c in colors]
     color_index = classify_color(im,thresholds)
     if color_index == -1:
-        return {"message": "Not found", "data": {"bla": "cool"}}, 404
-    product = Product(shape_id=shape,size_id=size,color_id=colors[color_index].id)
+        print("Color not found")
+        return {"message": "Die Farbe wurde nicht gefunden"}, 404
+    
+
+    sizes = Size.query.all()
+    size = get_size(im)
+    possible_sizes = []
+    for s in sizes:
+        rel_diff = abs( (s.width - size[0]) / size[0])
+        print(s.text + " " + str(rel_diff))
+        if(rel_diff < 0.3):
+            possible_sizes.append((s,rel_diff))
+    
+    if len(possible_sizes) == 0:
+        return {"message": "Die Größe wurde nicht gefunden"}, 404
+    possible_sizes = sorted(possible_sizes, key=lambda x: x[1])
+
+    size = possible_sizes[0]
+    
+    shape = "6d8ef867-6123-43dd-a8a8-1650f9a3c772" # hardcoded shape until we have a shape detection
+    size_id = size[0].id
+    
+    product = Product(shape_id=shape,size_id=size_id,color_id=colors[color_index].id)
     res_p: Product 
     try:
         existing_prod: Product = db.session.execute(
             select(Product)
             .where(Product.color_id == colors[color_index].id)
             .where(Product.shape_id == shape)
-            .where(Product.size_id == size)
+            .where(Product.size_id == size_id)
         ).scalar_one()
         res_p = existing_prod
         existing_prod.count = existing_prod.count + 1
@@ -79,7 +104,7 @@ def post_color():
     im = cv.imdecode(nparr, cv2.IMREAD_COLOR)
     #find color of the product and save as new color in database
     hex_str = analyze_color(im)
-    text = "unbenannte Farbe"
+    text = "-- unbenannte Farbe --"
     color = Color(hex=hex_str,text=text,display_hex=hex_str)
     try:
         db.session.add(color)

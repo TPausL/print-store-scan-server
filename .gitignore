@@ -4,5 +4,6 @@ test_images
 venv
 images/*
 images
+im_*.jpeg
 im_threshold*.jpeg
 add_color_*.jpeg
